@@ -1,0 +1,262 @@
+---
+title: "Landspítali"
+subtitle: "Fjármál og gögn"
+author: 
+    -   name: "Brynjólfur Gauti Guðrúnar Jónsson"
+        url: "https://twitter.com/bgautijonsson"
+        affiliation: "Tölfræði, Raunvísindadeild Háskóla Íslands"
+        affiliation-url: "https://www.hi.is/tolfraedi_0"
+date: today
+format: 
+    html:
+        code-fold: true
+        toc: true
+        toc-location: right
+        toc-title: Efnisyfirlit
+        smooth-scrol: true
+        margin-left: "10px"
+        fig-width: 14
+        fig-asp: 0.621
+        out-width: "100%"
+editor: source
+theme: flatly
+title-block-banner: true
+standalone: true
+self-contained: true
+execute: 
+  warning: false
+  error: false       
+---
+
+
+```{r}
+#| include: false
+
+library(cowplot)
+library(tidyverse)
+library(scales)
+library(readxl)
+library(ggthemes)
+library(kableExtra)
+library(gganimate)
+library(lubridate)
+library(geomtextpath)
+library(pxweb)
+```
+
+
+
+```{r}
+d <- read_csv2("landspitali.csv")
+
+visitala <- pxweb_get(
+    url ="https://px.hagstofa.is:443/pxis/api/v1/is/Efnahagur/visitolur/1_vnv/1_vnv/VIS01000.px", 
+    query = list(
+        "Mánuður" = c("*"),
+        "Vísitala"  = c("CPI"),
+        "Liður" = c("index")
+    ),
+    verbose = FALSE
+) |> 
+    as.data.frame() |> 
+    as_tibble() |> 
+    janitor::clean_names() |> 
+    separate(manudur, into = c("ar", "manudur"), sep = "M", convert = T) |> 
+    mutate(manudur = str_pad(manudur, width = 2, side = "left", pad = "0"),
+           date = str_c(ar, "-", manudur, "-01") |> ymd()) |> 
+    select(-manudur, -ar, -visitala, -lidur) |> 
+    mutate(ar = year(date)) |> 
+    group_by(ar) |> 
+    filter(date == min(date)) |> 
+    ungroup() |> 
+    mutate(visitala_2021 = visitala_neysluverds / visitala_neysluverds[ar == 2021]) |> 
+    select(-date, -visitala_neysluverds)
+
+
+d <- d |> 
+    inner_join(
+        visitala,
+        by = "ar"
+    )
+
+```
+
+```{r}
+reykjavik <- tibble(
+    ar = c(2013, 2014, 2015),
+    veikindahlutfall = c(0.061, 0.06, 0.059) * 100
+)
+
+
+p <- d |> 
+    ggplot(aes(ar, veikindahlutfall / 100)) +
+    geom_line() +
+    geom_rangeframe()+
+    scale_x_continuous(breaks = 2007:2022,
+                       labels = c(2007:2021, "2022\n(Jan-Mars)")) +
+    scale_y_continuous(labels = label_percent(),
+                       breaks = c(range(d$veikindahlutfall/100), 0.07,  0.08, 0.09, 0.1, 0.11)) +
+    theme_tufte() +
+    theme(plot.title = element_text(face = "bold")) +
+    labs(x = NULL,
+         y = NULL,
+         title = "Veikindahlutfall á Landspítala (2007 - 2022)",
+         subtitle = "Fengið úr starfsemisupplýsingum Landspítala",
+         caption = "Kóði og gögn: https://github.com/bgautijonsson/landspitali")
+
+p
+
+ggsave(plot = p, filename = "veikindahlutfall.png",
+       width = 8,
+       height = 0.5 * 8,
+       scale = 1.3,
+       bg = "white")
+```
+
+```{r}
+p <- d |> 
+    drop_na(starfsmannavelta) |> 
+    ggplot(aes(ar, starfsmannavelta / 100)) +
+    geom_line() +
+    geom_rangeframe()+
+    scale_x_continuous(breaks = 2007:2021) +
+    scale_y_continuous(labels = label_percent(),
+                       breaks = c(range(d$starfsmannavelta/100, na.rm = T), 0.12, 0.14)) +
+    theme_tufte() +
+    theme(plot.title = element_text(face = "bold")) +
+    labs(x = NULL,
+         y = NULL,
+         title = "Starfsmannavelta á Landspítala (2011 - 2021)")
+
+p
+
+ggsave(plot = p, filename = "starfsmannavelta.png",
+       width = 8,
+       height = 0.5 * 8,
+       scale = 1.3,
+       bg = "white")
+```
+
+
+
+```{r}
+p <- d |> 
+    drop_na(atvik) |> 
+    ggplot(aes(ar, atvik)) +
+    geom_line() +
+    geom_rangeframe()+
+    scale_x_continuous(breaks = 2007:2021) +
+    scale_y_continuous(labels = label_number(big.mark = ".", decimal.mark = ","),
+                       breaks = c(range(d$atvik, na.rm = T), 4000, 5000)) +
+    theme_tufte() +
+    theme(plot.title = element_text(face = "bold")) +
+    labs(x = NULL,
+         y = NULL,
+         title = "Fjöldi atvika sjúklinga á Landspítala (2013 - 2021)")
+
+p
+
+ggsave(plot = p, filename = "atvik.png",
+       width = 8,
+       height = 0.5 * 8,
+       scale = 1.3,
+       bg = "white")
+```
+
+```{r}
+p <- d |> 
+    drop_na(atvik) |> 
+    ggplot(aes(ar, atvik/legudagar * 1000)) +
+    geom_line() +
+    geom_rangeframe()+
+    scale_x_continuous(breaks = 2007:2021) +
+    scale_y_continuous(labels = label_number(big.mark = ".", decimal.mark = ",",),
+                       breaks = c(range(d$atvik/d$legudagar * 1000, na.rm = T), 20)) +
+    theme_tufte() +
+    theme(plot.title = element_text(face = "bold")) +
+    labs(x = NULL,
+         y = NULL,
+         title = "Fjöldi atvika sjúklinga per 1.000 legudagar á Landspítala (2013 - 2021)")
+
+p
+
+ggsave(plot = p, filename = "atvik_per_legudagar.png",
+       width = 8,
+       height = 0.5 * 8,
+       scale = 1.3,
+       bg = "white")
+```
+
+
+
+
+```{r}
+plot_dat <- d |> 
+    mutate(launakostnadur = launakostnadur/visitala_2021,
+           medallaun = launakostnadur*1000000/(stodugildi*12))
+
+
+p <- plot_dat |> 
+    ggplot(aes(ar, medallaun)) +
+    geom_line() +
+    geom_rangeframe()+
+    scale_x_continuous(breaks = 2007:2021) +
+    scale_y_continuous(labels = label_number(big.mark = ".", decimal.mark = ",",),
+                       breaks = c(range(plot_dat$medallaun, na.rm = T))) +
+    theme_tufte() +
+    theme(plot.title = element_text(face = "bold")) +
+    labs(x = NULL,
+         y = NULL,
+         title = "Meðallaun á Landspítala (2013 - 2021)")
+
+p
+
+ggsave(plot = p, filename = "medallaun.png",
+       width = 8,
+       height = 0.5 * 8,
+       scale = 1.3,
+       bg = "white")
+```
+
+
+
+
+
+
+```{r}
+plot_dat <-d |> 
+    select(ar, f1:f5) |> 
+    drop_na() |> 
+    pivot_longer(c(-ar)) |> 
+    group_by(ar) |> 
+    mutate(value = value / sum(value),
+           name = parse_number(name),
+           skor = sum(value * name) / 5,
+           flokkur = as_factor(name) |> fct_reorder(-name)) |> 
+    ungroup()
+
+
+p <- plot_dat |> 
+    ggplot(aes(ar, value)) +
+    geom_col(aes(fill = flokkur, group = flokkur), position = "stack", width = 0.95) +
+    geom_line(aes(y = skor), size = 2) +
+    scale_x_continuous(breaks = 2012:2021, 
+                       expand = expansion()) +
+    scale_y_continuous(labels = label_percent(),
+                       expand = expansion(),
+                       sec.axis = sec_axis(trans = ~ .x * 5)) +
+    scale_fill_brewer(type = "seq", direction = -1, palette = "OrRd") +
+    theme_half_open() +
+    labs(x = NULL,
+         y = NULL,
+         fill = NULL,
+         title = "Dreifing legudaga eftir hjúkrunarþyngdarflokk (2012 - 2021)",
+         subtitle = "Súlur sýna dreifingu (vinstri ás) og lína sýnir meðalþyngd legudags (hægri ás)")
+
+p
+
+
+ggsave(plot = p, filename = "hjukthyngd.png",
+       width = 8, height = 0.5 * 8, scale = 1.3, bg = "white")
+```
+

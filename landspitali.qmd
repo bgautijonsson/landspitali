@@ -157,14 +157,14 @@ p <- d |>
     ggplot(aes(ar, starfsmannavelta / 100)) +
     geom_line() +
     geom_rangeframe()+
-    scale_x_continuous(breaks = 2007:2021) +
+    scale_x_continuous(breaks = 2007:2022) +
     scale_y_continuous(labels = label_percent(),
                        breaks = c(range(d$starfsmannavelta/100, na.rm = T), 0.12, 0.14)) +
     theme_tufte() +
     theme(plot.title = element_text(face = "bold")) +
     labs(x = NULL,
          y = NULL,
-         title = "Starfsmannavelta á Landspítala (2011 - 2021)")
+         title = "Starfsmannavelta á Landspítala (2011 - 2022)")
 
 p
 
